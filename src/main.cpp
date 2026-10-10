@@ -16,9 +16,9 @@
 
 // Alias for convenience with std::filesystem
 using std::cin, std::cout;
+using json = nlohmann::json;
 using std::string, std::vector;
 namespace fs = std::filesystem;
-
 
 class Epoch{
     private:
@@ -54,20 +54,29 @@ class Epoch{
         }
 
         // takes input a string data, computes its hash, and then returns it.
-        string hashObject_fromData(const string& data){
+        string generateHash(const string& data){
             SHA1 sha1;
 
             return sha1(data);
         }
 
+        // returns the first 2 chars of the hash string
         string getDirName(const string& hash){
             return hash.substr(0, 2);                       // from index 0 to 2 (exclusive) ie the first 2 chars of the hash string
         }
 
+        // returns the last 38 chars of the hash string
         string getFileName(const string& hash){
             return hash.substr(2);                          // from index 2 to the very end of the hash string
         }
 
+        bool updateIndexFile(const fs::path& filePath, const string& fileHash){
+            json Jsin;
+            Jsin.parse()
+            const json indexFileData = getFileData(indexPath);
+
+            indexFileData.
+        }
 
     public:
         Epoch() 
@@ -120,15 +129,15 @@ class Epoch{
         }
 
         // takes input a file path, computes its hash, stores the file's contents into your database, and prints the generated object hash.
-        void hashObject_fromPath(const fs::path& filePath, const bool printHash){
+        string hashObject(const fs::path& filePath, const bool printHash){
             if (!fs::exists(filePath)){
                 cout << "[!] File doesn't exist.\n";
-                return;
+                return "-1";
             }
             
             // computing hash
             string fileData = getFileData(filePath);
-            string fileHash = hashObject_fromData(fileData);
+            string fileHash = generateHash(fileData);
 
             // creating .epoch/objects/<dirName> dir if it no exists            
             fs::path objectPath = (objectsPath / getDirName(fileHash));
@@ -146,6 +155,8 @@ class Epoch{
 
             if (printHash)
                 cout << "Hash (sha1): " << fileHash << '\n';
+
+            return fileHash;
         }
 
 
@@ -174,8 +185,17 @@ class Epoch{
                 return;
             }
 
-            // calul
-            hashObject_fromPath(filePath, false);
+            // calculates the hash and add its corresponding object to .epoch/objects/ 
+            const string& fileHash = hashObject(filePath, false);
+            if (fileHash == "-1"){
+                cout << "[!] Error hashing file.\n";
+                return;
+            }
+
+            // updates the index file (staging area)
+            bool indexed = updateIndexFile(filePath, fileHash);
+            if (!indexed)
+                cout << "[!] Error indexing filePath.\n";
         }
 
         // packages the staged entries from the index into a commit object and updates the HEAD pointer.
@@ -226,7 +246,7 @@ int main(int argc, char* argv[]){
     Epoch epoch;
     epoch.init();
     string str = "hakuna matata";
-    // cout << epoch.hashObject_fromData(str);
-    epoch.hashObject_fromPath(fs::current_path(), t);
+    // cout << epoch.generateHash(str);
+    epoch.hashObject("meow.txt", true);
     // epoch.catFile("da39a3ee5e6b4b0d3255bfef95601890afd80709");
 }
