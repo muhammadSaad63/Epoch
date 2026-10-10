@@ -27,11 +27,23 @@ class Epoch{
         fs::path headPath;
         fs::path indexPath;
         fs::path objectsPath;
+        bool     initialized;
 
+        // checks if epoch is initialized inside the current directory
+        bool checkIfInitialized(){
+            if (!initialized){
+                cout << "[!] Epoch is not initialized inside the current directory.\n";
+                return false;
+            }
+
+            return true;
+        }
+
+        // returns the string contents of a file located at <filePath>
         string getFileData(const fs::path& filePath){
             std::ifstream file(filePath, std::ios::in | std::ios::binary);
             
-            if (!file){
+            if (file){
                 std::stringstream fileData;
                 fileData << file.rdbuf();
                 
@@ -42,7 +54,8 @@ class Epoch{
         }
 
     public:
-        Epoch()  
+        Epoch() 
+            : initialized(false)
             {}
 
         ~Epoch() 
@@ -51,7 +64,7 @@ class Epoch{
 
         void init(){
             repoPath    = fs::current_path();
-            epochPath   = repoPath  / ".epoch";              // .epoch
+            epochPath   = repoPath  / ".epoch";             // .epoch
             headPath    = epochPath / "HEAD";               // .epoch/HEAD
             indexPath   = epochPath / "index";              // .epoch/index
             objectsPath = epochPath / "objects";            // .epoch/objects
@@ -80,12 +93,12 @@ class Epoch{
                 if (indexFile) indexFile.close();
             }
 
-            // .epoch/objects file
+            // .epoch/objects dir
             if (fs::exists(indexPath) && !fs::exists(objectsPath)){
-                std::ofstream objectsFile(objectsPath);
-                
-                if (objectsFile) objectsFile.close();
+                fs::create_directory(objectsPath);
             }
+
+            initialized = true;
         }
 
         string hashObject_fromData(const string& data){
@@ -175,6 +188,7 @@ int main(int argc, char* argv[]){
     Epoch epoch;
     epoch.init();
     string str = "hakuna matata";
-    cout << epoch.hashObject_fromData(str);
-    epoch.hashObject_fromPath(fs::current_path());
+    // cout << epoch.hashObject_fromData(str);
+    // epoch.hashObject_fromPath(fs::current_path());
+    epoch.catFile("da39a3ee5e6b4b0d3255bfef95601890afd80709");
 }
