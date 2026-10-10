@@ -166,6 +166,8 @@ class Epoch{
             
             if (!timeStamp.empty() && (timeStamp.back() == '\n'))
                 timeStamp.pop_back();
+
+            return timeStamp;
         }
 
         bool storeObject(const string& fileHash, const string& fileData){
@@ -249,6 +251,8 @@ class Epoch{
 
         // takes input a file path, computes its hash, stores the file's contents into your database, and prints the generated object hash.
         string hashObject(const fs::path& filePath, const bool printHash){
+            if (!checkIfInitialized()) return;
+
             if (!fs::exists(filePath)){
                 cout << "[!] File doesn't exist.\n";
                 return ":(";
@@ -267,9 +271,10 @@ class Epoch{
             return fileHash;
         }
 
-
         // takes input an object hash, looks up the stored object in your database, retrieves it, and then prints its contents to the terminal.
         void catFile(const string& objectHash){
+            if (!checkIfInitialized()) return;
+
             // validating objectHash's length
             if (objectHash.length() != 40) {
                 cout << "[!] Invalid hash length.\n";
@@ -288,6 +293,8 @@ class Epoch{
         
         // takes input a file path, stages the file by hashing its content and recording an entry into the index file.
         void add(const fs::path& filePath){
+            if (!checkIfInitialized()) return;
+
             if (!fs::exists(filePath)){
                 cout << "[!] File doesn't exist.\n";
                 return;
@@ -345,33 +352,45 @@ class Epoch{
 
         // inspects and displays differences between the working directory, the staging index, and the current HEAD commit.
         void status(){
-            
+            if (!checkIfInitialized()) return;
+
+            //
         }
 
         // compares line-by-line text changes between files in the working tree, index, or specific historical commits.
         void diff(){
-            
+            if (!checkIfInitialized()) return;
+
+            //
         }
 
         // traverses and prints the chronological commit history backwards starting from the current HEAD pointer.
         void log(){
-            
+            if (!checkIfInitialized()) return;
+
+            //
         }
 
         // creates, lists, or deletes lightweight reference pointers to specific commit hashes.
         void branch(){
-            
+            if (!checkIfInitialized()) return;
+
+            //
         }
 
         // switches the active HEAD pointer to a different branch or restores working directory files to a target commit.
         void checkout(){
-            
+            if (!checkIfInitialized()) return;
+
+            //
         }
 
         // combines the history and changes of a specified branch into your current active branch.
         void merge(){
-            
-        }   
+            if (!checkIfInitialized()) return;
+
+            //
+        }
 };
 
 
