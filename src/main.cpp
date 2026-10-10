@@ -60,6 +60,14 @@ class Epoch{
             return sha1(data);
         }
 
+        string getDirName(const string& hash){
+            return hash.substr(0, 2);                       // from index 0 to 2 (exclusive) ie the first 2 chars of the hash string
+        }
+
+        string getFileName(const string& hash){
+            return hash.substr(2);                          // from index 2 to the very end of the hash string
+        }
+
 
     public:
         Epoch() 
@@ -112,7 +120,7 @@ class Epoch{
         }
 
         // takes input a file path, computes its hash, stores the file's contents into your database, and prints the generated object hash.
-        void hashObject_fromPath(const fs::path& filePath){
+        void hashObject_fromPath(const fs::path& filePath, const bool printHash){
             if (!fs::exists(filePath)){
                 cout << "[!] File doesn't exist.\n";
                 return;
@@ -122,28 +130,40 @@ class Epoch{
             string fileData = getFileData(filePath);
             string fileHash = hashObject_fromData(fileData);
 
-            // storing file's contents in .epoch/objects/
-            fs::path objectPath = (objectsPath / fileHash);
+            // creating .epoch/objects/<dirName> dir if it no exists            
+            fs::path objectPath = (objectsPath / getDirName(fileHash));
+            if (!fs::exists(objectPath)){
+                fs::create_directory(objectPath);
+            }
+            
+            // storing file's contents in .epoch/objects/<dirName>/<fileName>
+            objectPath /= getFileName(fileHash);
             if (!fs::exists(objectPath)){
                 std::ofstream outFile(objectPath, std::ios::binary);
                 outFile << fileData;
                 outFile.close();
             }
 
-            cout << "Hash (sha1): " << fileHash << '\n';
+            if (printHash)
+                cout << "Hash (sha1): " << fileHash << '\n';
         }
 
 
         // takes input an object hash, looks up the stored object in your database, retrieves it, and then prints its contents to the terminal.
         void catFile(const string& objectHash){
-            string objectPath = (objectsPath / objectHash);
+            // validating objectHash's length
+            if (objectHash.length() != 40) {
+                cout << "[!] Invalid hash length.\n";
+                return;
+            }
+
+            fs::path objectPath = (objectsPath / getDirName(objectHash) / getFileName(objectHash));
 
             if (fs::exists(objectPath)){
                 cout << getFileData(objectPath);
             }
             else{
-                cout << "[!] Hash doesnt exist.\n";
-                return;
+                cout << "[!] Hash doesn't exist.\n";
             }
         }
         
@@ -154,7 +174,8 @@ class Epoch{
                 return;
             }
 
-            //
+            // calul
+            hashObject_fromPath(filePath, false);
         }
 
         // packages the staged entries from the index into a commit object and updates the HEAD pointer.
@@ -206,6 +227,6 @@ int main(int argc, char* argv[]){
     epoch.init();
     string str = "hakuna matata";
     // cout << epoch.hashObject_fromData(str);
-    // epoch.hashObject_fromPath(fs::current_path());
-    epoch.catFile("da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    epoch.hashObject_fromPath(fs::current_path(), t);
+    // epoch.catFile("da39a3ee5e6b4b0d3255bfef95601890afd80709");
 }
