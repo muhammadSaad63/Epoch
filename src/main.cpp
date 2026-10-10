@@ -251,19 +251,21 @@ class Epoch{
 
         // takes input a file path, computes its hash, stores the file's contents into your database, and prints the generated object hash.
         string hashObject(const fs::path& filePath, const bool printHash){
-            if (!checkIfInitialized()) return;
+            if (!checkIfInitialized()) return ":(";
 
             if (!fs::exists(filePath)){
                 cout << "[!] File doesn't exist.\n";
                 return ":(";
             }
             
-            // computing hash
-            string fileData = getFileData(filePath);
-            string fileHash = generateHash(fileData);
+            // computing hash & data
+            string fileData           = getFileData(filePath);
+            string fileHash           = generateHash(fileData);
+            string compressedFileData = compressData(fileData);
 
             // storing data at .epoch/objects/<dirName>/<fileName>       
-            if (!storeObject(fileHash, fileData)) return;
+            if (!storeObject(fileHash, compressedFileData)) return ":(";
+
 
             if (printHash)
                 cout << "Hash (sha1): " << fileHash << '\n';
@@ -283,12 +285,18 @@ class Epoch{
 
             fs::path objectPath = (objectsPath / getDirName(objectHash) / getFileName(objectHash));
 
-            if (fs::exists(objectPath)){
-                cout << getFileData(objectPath);
-            }
-            else{
+            // object with hash objectHash doesn't exist
+            if (!fs::exists(objectPath)){
                 cout << "[!] Hash doesn't exist.\n";
+                return;
             }
+
+            // object with hash objectHash exists
+            string objectData             = getFileData(objectPath);
+            string decompressedObjectData = decompressData(objectData);
+
+            // displaying contents at objectHash
+            cout << decompressedObjectData << '\n';
         }
         
         // takes input a file path, stages the file by hashing its content and recording an entry into the index file.
