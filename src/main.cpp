@@ -16,7 +16,7 @@
 
 // Alias for convenience with std::filesystem
 using std::cin, std::cout;
-using json = nlohmann::json;
+using Json = nlohmann::json;
 using std::string, std::vector;
 namespace fs = std::filesystem;
 
@@ -50,7 +50,7 @@ class Epoch{
                 return fileData.str();    
             }
             
-            return "";
+            return ":(";
         }
 
         // takes input a string data, computes its hash, and then returns it.
@@ -71,11 +71,27 @@ class Epoch{
         }
 
         bool updateIndexFile(const fs::path& filePath, const string& fileHash){
-            json Jsin;
-            Jsin.parse()
-            const json indexFileData = getFileData(indexPath);
+            Json jsonData;
 
-            indexFileData.
+            // accessing & parsing json data from indexFile
+            const string& indexData = getFileData(indexPath);
+            jsonData = Json::parse(indexData);
+
+            // adding key-value pair
+            jsonData[filePath.string()] = fileHash;
+
+            // opening indexFile (in overwrite mode)
+            std::ofstream indexFile(indexPath, std::ios::trunc);
+            if (!indexFile) {
+                cout << "[!] Failed to open index file for writing.\n";
+                return false;
+            }
+
+            // overwriting indexFile with updated jsonData
+            indexFile << jsonData.dump(4);
+            indexFile.close();
+
+            return true;
         }
 
     public:
@@ -98,6 +114,8 @@ class Epoch{
             // checking if epoch was already initialized previously
             if (fs::exists(repoPath) && fs::exists(epochPath) && fs::exists(headPath) && fs::exists(indexPath) && fs::exists(objectsPath)){
                 cout << "[!] Epoch is already initialized inside the current directory.\n";
+                initialized = true;
+                
                 return;
             }
 
@@ -117,7 +135,10 @@ class Epoch{
             if (fs::exists(headPath) && !fs::exists(indexPath)){
                 std::ofstream indexFile(indexPath);
                 
-                if (indexFile) indexFile.close();
+                if (indexFile){
+                    indexFile << "{}";
+                    indexFile.close();
+                }
             }
 
             // .epoch/objects dir
@@ -132,7 +153,7 @@ class Epoch{
         string hashObject(const fs::path& filePath, const bool printHash){
             if (!fs::exists(filePath)){
                 cout << "[!] File doesn't exist.\n";
-                return "-1";
+                return ":(";
             }
             
             // computing hash
@@ -187,7 +208,7 @@ class Epoch{
 
             // calculates the hash and add its corresponding object to .epoch/objects/ 
             const string& fileHash = hashObject(filePath, false);
-            if (fileHash == "-1"){
+            if (fileHash == ":("){
                 cout << "[!] Error hashing file.\n";
                 return;
             }
@@ -195,7 +216,7 @@ class Epoch{
             // updates the index file (staging area)
             bool indexed = updateIndexFile(filePath, fileHash);
             if (!indexed)
-                cout << "[!] Error indexing filePath.\n";
+                cout << "[!] Error indexing file.\n";
         }
 
         // packages the staged entries from the index into a commit object and updates the HEAD pointer.
