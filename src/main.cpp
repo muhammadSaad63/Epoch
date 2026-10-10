@@ -8,7 +8,7 @@
 
 // External library includes (from src/libs/*)
 #include "libs/dtl/dtl.hpp"                             // Diff Engine: dtl
-// #include "libs/miniz/miniz.h"                           // Compression: miniz
+#include "libs/miniz/miniz.h"                           // Compression: miniz
 #include "libs/rang/rang.hpp"                           // CLI Formatting / Terminal Colors: rang
 #include "libs/cli11/CLI11.hpp"                         // Argument Parsing: CLI11
 #include "libs/nlohmann/json.hpp"                       // Indexing / JSON: nlohmann/json
@@ -92,6 +92,46 @@ class Epoch{
             indexFile.close();
 
             return true;
+        }
+
+        // uses miniz library to compress/deflate uncompressed data
+        string compressData(const string& data){
+            if (data.empty()) 
+                return "";
+            
+            uLongf destLen = compressBound(data.size());
+            string dest(destLen, '\0');
+            
+            if (compress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size()) == Z_OK) {
+                dest.resize(destLen);
+                return dest;
+            }
+
+            return "";
+        }
+
+        // uses miniz library to uncompress/inflate compressed data
+        string decompressData(const string& data){
+            if (data.empty()) 
+                return "";
+            
+            // Estimate uncompressed size (or grow buffer if needed)
+            uLongf destLen = data.size() * 4; 
+            string dest(destLen, '\0');
+            
+            int res = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
+            while (res == Z_BUF_ERROR){
+                destLen *= 2;
+                dest.resize(destLen);
+                res = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
+            }
+            
+            if (res == Z_OK){
+                dest.resize(destLen);
+                return dest;
+            }
+
+            return "";
         }
 
     public:
