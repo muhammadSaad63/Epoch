@@ -20,6 +20,8 @@ using Json = nlohmann::json;
 using std::string, std::vector;
 namespace fs = std::filesystem;
 
+
+
 class Epoch{
     private:
         fs::path repoPath;
@@ -82,7 +84,7 @@ class Epoch{
 
             // opening indexFile (in overwrite mode)
             std::ofstream indexFile(indexPath, std::ios::trunc);
-            if (!indexFile) {
+            if (!indexFile){
                 cout << "[!] Failed to open index file for writing.\n";
                 return false;
             }
@@ -134,6 +136,7 @@ class Epoch{
             return "";
         }
 
+        // updating the HEAD pointer with newCommitHash
         bool updateHEAD(const string& newCommitHash){
             std::ofstream headFile(headPath);
             
@@ -148,6 +151,7 @@ class Epoch{
             return true;
         }
 
+        // returns the JSON object for the commit
         Json getJSONCommitObject(const string& parentHash, const string& commitMessage, const string& indexData, const string& timeStamp){
             Json commitObject;
 
@@ -159,6 +163,7 @@ class Epoch{
             return commitObject;
         }
 
+        // returns the current timeStamp in human-readable format
         string getCurrentTimeStamp(){
             auto now         = std::chrono::system_clock::now();
             auto now_time_t  = std::chrono::system_clock::to_time_t(now);
@@ -170,6 +175,7 @@ class Epoch{
             return timeStamp;
         }
 
+        // add a new object entry to the objects directory
         bool storeObject(const string& fileHash, const string& fileData){
             // creating .epoch/objects/<dirName> dir if it no exists            
             fs::path objectPath = (objectsPath / getDirName(fileHash));
