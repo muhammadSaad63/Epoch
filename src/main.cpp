@@ -28,6 +28,18 @@ class Epoch{
         fs::path indexPath;
         fs::path objectsPath;
 
+        string getFileData(const fs::path& filePath){
+            std::ifstream file(filePath, std::ios::in | std::ios::binary);
+            
+            if (!file){
+                std::stringstream fileData;
+                fileData << file.rdbuf();
+                
+                return fileData.str();    
+            }
+            
+            return "";
+        }
 
     public:
         Epoch()  
@@ -76,31 +88,41 @@ class Epoch{
             }
         }
 
-        string getFileData(const fs::path& filePath){
-            if (fs::exists(filePath)){
-                std::istream file(filePath);
-                    return file.
-            }
-        }
-
         string hashObject_fromData(const string& data){
             SHA1 sha1;
-    
+
             return sha1(data);
         }
 
-        string hashObject_fromFile(const fs::path& filePath){
-            SHA1 sha1;
-            string data = getFileData(filePath);
-    
-            return sha1(data);
+        // takes input a file path, computes its hash, stores the file's contents into your database, and prints the generated object hash.
+        void hashObject_fromPath(const fs::path& filePath){
+            if (!fs::exists(filePath)){
+                cout << "[!] FilePath doesn't exist.\n";
+                return;
+            }
+            
+            // computing hash
+            string fileData = getFileData(filePath);
+            string fileHash = hashObject_fromData(fileData);
+
+            // storing file's contents in .epoch/objects/
+            fs::path objectPath = (objectsPath / fileHash);
+            if (!fs::exists(objectPath)){
+                std::ofstream outFile(objectPath, std::ios::binary);
+                outFile << fileData;
+                outFile.close();
+            }
+
+            cout << "Hash (sha1): " << fileHash << '\n';
         }
 
-        void catFile(const string& hash){
-            string hashPath = (objectsPath / hash);
 
-            if (fs::exists(hashPath)){
+        // takes input an object hash, looks up the stored object in your database, retrieves it, and then prints its contents to the terminal.
+        void catFile(const string& objectHash){
+            string objectPath = (objectsPath / objectHash);
 
+            if (fs::exists(objectPath)){
+                cout << getFileData(objectPath);
             }
             else{
                 cout << "[!] Hash doesnt exist.\n";
@@ -152,6 +174,7 @@ int main(int argc, char* argv[]){
 
     Epoch epoch;
     epoch.init();
-    epoch.init();
-
+    string str = "hakuna matata";
+    cout << epoch.hashObject_fromData(str);
+    epoch.hashObject_fromPath(fs::current_path());
 }
