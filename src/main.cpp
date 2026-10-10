@@ -53,6 +53,14 @@ class Epoch{
             return "";
         }
 
+        // takes input a string data, computes its hash, and then returns it.
+        string hashObject_fromData(const string& data){
+            SHA1 sha1;
+
+            return sha1(data);
+        }
+
+
     public:
         Epoch() 
             : initialized(false)
@@ -61,14 +69,16 @@ class Epoch{
         ~Epoch() 
             {}
 
-
+        // initializes a new, empty epoch version control repository by creating the necessary .epoch directory structure, HEAD, index, and objects folders.
         void init(){
+            // setting path attributes
             repoPath    = fs::current_path();
             epochPath   = repoPath  / ".epoch";             // .epoch
             headPath    = epochPath / "HEAD";               // .epoch/HEAD
             indexPath   = epochPath / "index";              // .epoch/index
             objectsPath = epochPath / "objects";            // .epoch/objects
 
+            // checking if epoch was already initialized previously
             if (fs::exists(repoPath) && fs::exists(epochPath) && fs::exists(headPath) && fs::exists(indexPath) && fs::exists(objectsPath)){
                 cout << "[!] Epoch is already initialized inside the current directory.\n";
                 return;
@@ -101,16 +111,10 @@ class Epoch{
             initialized = true;
         }
 
-        string hashObject_fromData(const string& data){
-            SHA1 sha1;
-
-            return sha1(data);
-        }
-
         // takes input a file path, computes its hash, stores the file's contents into your database, and prints the generated object hash.
         void hashObject_fromPath(const fs::path& filePath){
             if (!fs::exists(filePath)){
-                cout << "[!] FilePath doesn't exist.\n";
+                cout << "[!] File doesn't exist.\n";
                 return;
             }
             
@@ -142,38 +146,51 @@ class Epoch{
                 return;
             }
         }
+        
+        // takes input a file path, stages the file by hashing its content and recording an entry into the index file.
+        void add(const fs::path& filePath){
+            if (!fs::exists(filePath)){
+                cout << "[!] File doesn't exist.\n";
+                return;
+            }
 
-        void add(){
+            //
+        }
+
+        // packages the staged entries from the index into a commit object and updates the HEAD pointer.
+        void commit(const string& commitMessage){
             
         }
 
-        void commit(){
-            
-        }
-
-        void log(){
-            
-        }
-
+        // inspects and displays differences between the working directory, the staging index, and the current HEAD commit.
         void status(){
             
         }
 
+        // compares line-by-line text changes between files in the working tree, index, or specific historical commits.
         void diff(){
             
         }
 
+        // traverses and prints the chronological commit history backwards starting from the current HEAD pointer.
+        void log(){
+            
+        }
+
+        // creates, lists, or deletes lightweight reference pointers to specific commit hashes.
         void branch(){
             
         }
 
-        void merge(){
-            
-        }
-
+        // switches the active HEAD pointer to a different branch or restores working directory files to a target commit.
         void checkout(){
             
         }
+
+        // combines the history and changes of a specified branch into your current active branch.
+        void merge(){
+            
+        }   
 };
 
 
