@@ -261,7 +261,75 @@ class Epoch{
 
         // packages the staged entries from the index into a commit object and updates the HEAD pointer.
         void commit(const string& commitMessage){
-            
+            if (!checkIfInitialized()) return;
+
+            // reading the current index file
+            string indexData = getFileData(indexPath);
+            if (indexData.empty() || indexData == "{}"){
+                cout << "[!] Nothing to commit, working tree clean.\n";
+                return;
+            }
+
+            // getting hash at HEAD
+            string parentHash = getFileData(headPath);
+            if (parentHash.empty())
+                parentHash = "";
+
+            // getting current time
+            {
+                auto now         = std::chrono::system_clock::now();
+                auto now_time_t  = std::chrono::system_clock::to_time_t(now);
+                string timestamp = std::ctime(&now_time_t);
+                
+                if (!timestamp.empty() && timestamp.back() == '\n')
+                    timestamp.pop_back();
+            }
+
+            // making the commit json object
+            Json commitObject;
+            commitObject["parent"]    = parentHash;
+            commitObject["message"]   = commitMessage;
+            commitObject["snapshot"]  = Json::parse(indexData);
+            commitObject["timestamp"] = timestamp;
+
+            // hashing and compressing commitString
+            string commitString     = commitObject.dump();
+            string compressedCommit = compressData(commitString);
+            string commitHash       = generateHash(commitString);
+
+            // saving the compressedCommit string into .epoch/objects/commitHash
+            {
+                fs::path commitObjectPath = (objectsPath / getDirName(commitHash));
+                if (!fs::exists(commitObjectPath))
+                    fs::create_directory(commitObjectPath);
+
+                commitObjectPath /= getFileName(commitHash);
+                std::ofstream outFile(commitObjectPath, std::ios::binary);
+                if (outFile){
+                    outFile << compressedCommit;
+                    outFile.close();
+                } 
+                else{
+                    cout << "[!] Failed to write commit object to database.\n";
+                    return;
+                }
+            }
+
+            // updating HEAD to now point to the (new) commitHash
+            std::ofstream headFile(headPath);
+            if (headFile){
+                headFile << commitHash;
+                headFile.close();
+            } 
+            else {
+                cout << "[!] Failed to update HEAD pointer.\n";
+                return;
+            }
+
+            // printing details if successful
+            cout << "[*] Committed successfully!"         << '\n';
+            cout << "    Commit Hash : " << commitHash    << '\n';
+            cout << "    Message     : " << commitMessage << '\n';
         }
 
         // inspects and displays differences between the working directory, the staging index, and the current HEAD commit.
