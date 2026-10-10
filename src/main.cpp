@@ -134,6 +134,64 @@ class Epoch{
             return "";
         }
 
+        bool updateHEAD(const string& newCommitHash){
+            std::ofstream headFile(headPath);
+            
+            if (!headFile){
+                cout << "[!] Failed to update HEAD pointer.\n";
+                return false;
+            }
+
+            headFile << newCommitHash;
+            headFile.close();
+
+            return true;
+        }
+
+        Json getJSONCommitObject(const string& parentHash, const string& commitMessage, const string& indexData, const string& timeStamp){
+            Json commitObject;
+
+            commitObject["snapShot"]      = Json::parse(indexData);
+            commitObject["timeStamp"]     = timeStamp;
+            commitObject["parentHash"]    = parentHash;
+            commitObject["commitMessage"] = commitMessage;
+
+            return commitObject;
+        }
+
+        string getCurrentTimeStamp(){
+            auto now         = std::chrono::system_clock::now();
+            auto now_time_t  = std::chrono::system_clock::to_time_t(now);
+            string timeStamp = std::ctime(&now_time_t);
+            
+            if (!timeStamp.empty() && (timeStamp.back() == '\n'))
+                timeStamp.pop_back();
+        }
+
+        bool storeObject(const string& fileHash, const string& fileData){
+            // creating .epoch/objects/<dirName> dir if it no exists            
+            fs::path objectPath = (objectsPath / getDirName(fileHash));
+            if (!fs::exists(objectPath))
+                fs::create_directory(objectPath);
+
+            // creating .epoch/objects/<dirName>/<fileName> if it no exists
+            objectPath /= getFileName(fileHash);
+            std::ofstream outFile(objectPath, std::ios::binary);
+
+            // storing file's contents in .epoch/objects/<dirName>/<fileName>
+            {
+                if (!outFile){
+                    outFile << "[!] Failed to write commit object to database.\n";
+                    return false;
+                } 
+                
+                outFile << fileData;
+                outFile.close();
+
+                return true;
+            }
+        }
+
     public:
         Epoch() 
             : initialized(false)
@@ -200,19 +258,8 @@ class Epoch{
             string fileData = getFileData(filePath);
             string fileHash = generateHash(fileData);
 
-            // creating .epoch/objects/<dirName> dir if it no exists            
-            fs::path objectPath = (objectsPath / getDirName(fileHash));
-            if (!fs::exists(objectPath)){
-                fs::create_directory(objectPath);
-            }
-            
-            // storing file's contents in .epoch/objects/<dirName>/<fileName>
-            objectPath /= getFileName(fileHash);
-            if (!fs::exists(objectPath)){
-                std::ofstream outFile(objectPath, std::ios::binary);
-                outFile << fileData;
-                outFile.close();
-            }
+            // storing data at .epoch/objects/<dirName>/<fileName>       
+            if (!storeObject(fileHash, fileData)) return;
 
             if (printHash)
                 cout << "Hash (sha1): " << fileHash << '\n';
@@ -272,25 +319,12 @@ class Epoch{
 
             // getting hash at HEAD
             string parentHash = getFileData(headPath);
-            if (parentHash.empty())
-                parentHash = "";
 
-            // getting current time
-            {
-                auto now         = std::chrono::system_clock::now();
-                auto now_time_t  = std::chrono::system_clock::to_time_t(now);
-                string timestamp = std::ctime(&now_time_t);
-                
-                if (!timestamp.empty() && timestamp.back() == '\n')
-                    timestamp.pop_back();
-            }
+            // getting current timeStamp
+            string timeStamp = getCurrentTimeStamp();
 
             // making the commit json object
-            Json commitObject;
-            commitObject["parent"]    = parentHash;
-            commitObject["message"]   = commitMessage;
-            commitObject["snapshot"]  = Json::parse(indexData);
-            commitObject["timestamp"] = timestamp;
+            Json commitObject = getJSONCommitObject(parentHash, commitMessage, indexData, timeStamp);
 
             // hashing and compressing commitString
             string commitString     = commitObject.dump();
@@ -298,33 +332,10 @@ class Epoch{
             string commitHash       = generateHash(commitString);
 
             // saving the compressedCommit string into .epoch/objects/commitHash
-            {
-                fs::path commitObjectPath = (objectsPath / getDirName(commitHash));
-                if (!fs::exists(commitObjectPath))
-                    fs::create_directory(commitObjectPath);
-
-                commitObjectPath /= getFileName(commitHash);
-                std::ofstream outFile(commitObjectPath, std::ios::binary);
-                if (outFile){
-                    outFile << compressedCommit;
-                    outFile.close();
-                } 
-                else{
-                    cout << "[!] Failed to write commit object to database.\n";
-                    return;
-                }
-            }
+            if (!storeObject(commitHash, compressedCommit)) return;
 
             // updating HEAD to now point to the (new) commitHash
-            std::ofstream headFile(headPath);
-            if (headFile){
-                headFile << commitHash;
-                headFile.close();
-            } 
-            else {
-                cout << "[!] Failed to update HEAD pointer.\n";
-                return;
-            }
+            if (!updateHEAD(commitHash)) return;
 
             // printing details if successful
             cout << "[*] Committed successfully!"         << '\n';
