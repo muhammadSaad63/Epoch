@@ -76,7 +76,7 @@ class Epoch{
             return hash.substr(0, 2);                       // from index 0 to 2 (exclusive) ie the first 2 chars of the hash string
         }
 
-        // returns the last 38 chars of the hash string
+        // returns the remaining chars of the hash string (either 38 or 62)
         string getFileName(const string& hash){
             return hash.substr(2);                          // from index 2 to the very end of the hash string
         }
@@ -274,6 +274,18 @@ class Epoch{
             return true;
         }
 
+        // validates whether the provided hash is of the correct length
+        bool isHashLengthValid(const string& hashToValidate){
+            auto expectedLen = (( useSHA256 )? 64 : 40);
+
+            if (hashToValidate.length() != expectedLen){
+                cout << "[!] Invalid commit hash length.\n";
+                return false;
+            }
+
+            return true;
+        }
+
     public:
         Epoch() 
             : initialized(false)
@@ -359,10 +371,8 @@ class Epoch{
             if (!checkIfInitialized()) return;
 
             // validating objectHash's length
-            if (objectHash.length() != ((useSHA256)? 64 : 40)){
-                cout << "[!] Invalid hash length.\n";
+            if (!isHashLengthValid(objectHash)) 
                 return;
-            }
 
             fs::path objectPath = (objectsPath / getDirName(objectHash) / getFileName(objectHash));
 
@@ -480,26 +490,34 @@ class Epoch{
         void diff(const string& commitHashToCompare){
             if (!checkIfInitialized()) return;
 
-            // accessing file with <commitHashToCompare>
-            const string objectPath = (objectsPath / getDirName(commitHashToCompare) / getFileData(commitHashToCompare));
-            if (fs::exists(objectPath)){
-                cout << "[!] No such hash exists.\n";
+            // validating hash length
+            if (!isHashLengthValid(commitHashToCompare)) 
+                return;
+
+            // building & checking objectPath
+            fs::path objectPath = objectsPath / getDirName(commitHashToCompare) / getFileName(commitHashToCompare);
+            if (!fs::exists(objectPath)){
+                cout << "[!] No such commit hash exists.\n";
                 return;
             }
-
-            // accessing, inflating, & parsing json data at <objectPath> file
+            
+            // accessing, inflating, & parsing json data at <objectPath> file   
             const string rawCommitData          = getFileData(objectPath);
             const string decompressedCommitData = decompressData(rawCommitData);
             const JSON   jsonCommitData         = JSON::parse(decompressedCommitData);
 
-            // accessing, inflating, & parsing json data at jsonCommitData["snapShot"]
-            const string rawSnapShot          = jsonCommitData["snapShot"];
-            const string decompressedSnapShot = decompressData(rawSnapShot);
-            const JSON jsonSnapShot         = JSON::parse(decompressedSnapShot);
+            // accessing snapShot at jsonCommitData["snapShot"]
+            const JSON jsonSnapShot = jsonCommitData["snapShot"];
+            if (jsonSnapShot.empty()){
+                cout << "[!] Commit snapshot is empty.\n";
+                return;
+            }
 
             // iterating across every json object in jsonSnapShot array
             for (const auto& [filePath, fileHash] : jsonSnapShot.items()){
+                const string fileData = getFileData(filePath);
                 
+                const string toComparePath = (objectsPath / getDirName(fileHash) / getFileName(fileHash));
             }
         }
 
