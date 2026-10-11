@@ -465,8 +465,9 @@ class Epoch{
             while (!parentCommit.empty()){
                 objectPath = (objectsPath / getDirName(parentCommit) / getFileName(parentCommit));
                 
-                string rawCommitData  = getFileData(objectPath);
-                Json   jsonCommitData = Json::parse(rawCommitData);
+                string rawCommitData          = getFileData(objectPath);
+                string decompressedCommitData = decompressData(rawCommitData);
+                Json   jsonCommitData         = Json::parse(decompressedCommitData);
 
                 // displaying commitInfo
                 cout    << "commit "  << parentCommit                    << '\n'
