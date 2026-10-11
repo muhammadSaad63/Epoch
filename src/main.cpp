@@ -528,7 +528,7 @@ class Epoch{
             const string timeStamp = getCurrentTimeStamp();
 
             // making the commit json object
-            const JSON commitObject = getJSONCommitObject(author, indexData, timeStamp, parentHash, commitMessage);
+            const JSON commitObject = getJSONCommitObject(author, snapShot.dump(), timeStamp, parentHash, commitMessage);
 
             // hashing and compressing commitString
             string commitString     = commitObject.dump();
