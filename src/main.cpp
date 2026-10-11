@@ -10,14 +10,14 @@
 #include <filesystem>
 
 // External library includes (from src/libs/*)
-#include "libs/dtl/dtl.hpp"                             // Diff Engine: dtl
-#include "libs/miniz/miniz.h"                           // Compression: miniz
-#include "libs/rang/rang.hpp"                           // CLI Formatting / Terminal Colors: rang
-#include "libs/cli11/CLI11.hpp"                         // Argument Parsing: CLI11
-#include "libs/nlohmann/json.hpp"                       // Indexing / JSON: nlohmann/json
-#include "libs/hash-library/sha1.h"                     // Hashing: stbrumme/hash-library
-#include "libs/argparse/argparse.hpp"                   // Argument Parsing: argparse
-#include "libs/hash-library/sha256.h"                   // Hashing: stbrumme/hash-library
+#include "include/external/dtl/dtl.hpp"                             // Diff Engine: dtl
+#include "include/external/miniz/miniz.h"                           // Compression: miniz
+#include "include/external/rang/rang.hpp"                           // CLI Formatting / Terminal Colors: rang
+#include "include/external/cli11/CLI11.hpp"                         // Argument Parsing: CLI11
+#include "include/external/nlohmann/json.hpp"                       // Indexing / JSON: nlohmann/json
+#include "include/external/hash-library/sha1.h"                     // Hashing: stbrumme/hash-library
+#include "include/external/argparse/argparse.hpp"                   // Argument Parsing: argparse
+#include "include/external/hash-library/sha256.h"                   // Hashing: stbrumme/hash-library
 
 // Alias for convenience with std::filesystem
 using std::cin, std::cout;
