@@ -16,7 +16,8 @@
 #include "libs/cli11/CLI11.hpp"                         // Argument Parsing: CLI11
 #include "libs/nlohmann/json.hpp"                       // Indexing / JSON: nlohmann/json
 #include "libs/hash-library/sha1.h"                     // Hashing: stbrumme/hash-library
-#include "libs/hash-library/sha256.h"                     // Hashing: stbrumme/hash-library
+#include "libs/argparse/argparse.hpp"                   // Argument Parsing: argparse
+#include "libs/hash-library/sha256.h"                   // Hashing: stbrumme/hash-library
 
 // Alias for convenience with std::filesystem
 using std::cin, std::cout;
@@ -494,17 +495,34 @@ class Epoch{
         void commit(const string& commitMessage){
             if (!checkIfInitialized()) return;
 
-            // reading the current index file
-            string indexData = getFileData(indexPath);
-            if (indexData.empty() || indexData == "{}"){
+            // getting hash at HEAD
+            const string parentHash = getFileData(headPath);
+
+            // starting from the parent's snapshot so that files which weren't re-added aren't lost
+            JSON snapShot = JSON::object();
+            {
+                if (!parentHash.empty()){
+                    JSON parentCommit = parseCommitObject(parentHash);
+                    if (parentCommit.empty()) return;
+
+                    snapShot = parentCommit["snapShot"];
+                }
+            }
+            const JSON parentSnapShot = snapShot;
+
+            // overlaying the staged entries on top of it
+            const JSON indexJson = getIndexJson();
+            for (const auto& [filePathStr, fileHash] : indexJson.items())
+                snapShot[filePathStr] = fileHash;                               // ie updating the filehashes of those files which were added in the commit; others remain the same
+
+            // nothing changed compared to the parent commit
+            if (snapShot == parentSnapShot){
                 cout << "[!] Nothing to commit, working tree clean.\n";
                 return;
             }
 
+            // getting name of current user/author from ENV variables
             const string author = getCurrentUser();
-
-            // getting hash at HEAD
-            const string parentHash = getFileData(headPath);
 
             // getting current timeStamp
             const string timeStamp = getCurrentTimeStamp();
@@ -667,6 +685,173 @@ class Epoch{
             if (!checkIfInitialized()) return;
 
             //
+        }
+};
+
+
+
+class EpochCLI{
+    private:
+        Epoch& epoch;
+
+        argparse::ArgumentParser program;                   // top-level parser: `epoch`
+        argparse::ArgumentParser initCmd;                   // sub-parsers: `epoch <command>`
+        argparse::ArgumentParser hashObjectCmd;
+        argparse::ArgumentParser catFileCmd;
+        argparse::ArgumentParser addCmd;
+        argparse::ArgumentParser commitCmd;
+        argparse::ArgumentParser logCmd;
+        argparse::ArgumentParser diffCmd;
+        argparse::ArgumentParser statusCmd;
+        argparse::ArgumentParser branchCmd;
+        argparse::ArgumentParser switchCmd;
+        argparse::ArgumentParser checkoutCmd;
+        argparse::ArgumentParser mergeCmd;
+ 
+        vector<argparse::ArgumentParser*> commands;         // every sub-parser, for registering & "was any command used?" checks
+ 
+        // declares every sub-command along with its arguments & flags, then registers them in the main parser
+        void setupCommands(){
+            // epoch init
+            initCmd.add_description("Create an empty epoch repository in the current directory");
+ 
+            // epoch hash-object <file>
+            hashObjectCmd.add_description("Compute the hash of a file & store it in the object database");
+            hashObjectCmd.add_argument("file").help("path of the file to hash");
+ 
+            // epoch cat-file <hash>
+            catFileCmd.add_description("Print the contents of a stored object");
+            catFileCmd.add_argument("hash").help("full object hash");
+ 
+            // epoch add <file>
+            addCmd.add_description("Stage a file for the next commit");
+            addCmd.add_argument("file").help("path of the file to stage");
+ 
+            // epoch commit -m <message>
+            commitCmd.add_description("Record the staged changes as a new commit");
+            commitCmd.add_argument("-m", "--message").required().help("commit message");
+ 
+            // epoch log
+            logCmd.add_description("Show the commit history of the current HEAD");
+ 
+            // epoch diff <commit>
+            diffCmd.add_description("Show line-by-line changes between a commit and the working tree");
+            diffCmd.add_argument("commit").help("full commit hash to compare against");
+ 
+            // epoch status
+            statusCmd.add_description("Show staged, unstaged and untracked files");
+ 
+            // epoch branch [name] [-d | -D]
+            branchCmd.add_description("List, create or delete branches");
+            branchCmd.add_argument("name").default_value(string("")).nargs(0, 1).help("branch name (omit to list all branches)");
+            branchCmd.add_argument("-d", "--delete").default_value(false).implicit_value(true).help("delete the branch (only if it's fully merged)");
+            branchCmd.add_argument("-D", "--force-delete").default_value(false).implicit_value(true).help("delete the branch even if it isn't merged");
+ 
+            // epoch switch [-c] <name>
+            switchCmd.add_description("Switch to another branch");
+            switchCmd.add_argument("name").help("branch to switch to");
+            switchCmd.add_argument("-c", "--create").default_value(false).implicit_value(true).help("create the branch before switching to it");
+ 
+            // epoch checkout [-b] <target>
+            checkoutCmd.add_description("Switch to a branch, or detach HEAD at a commit");
+            checkoutCmd.add_argument("target").help("branch name or full commit hash");
+            checkoutCmd.add_argument("-b", "--branch").default_value(false).implicit_value(true).help("create the branch before switching to it");
+ 
+            // epoch merge <branch>
+            mergeCmd.add_description("Merge a branch into the current branch");
+            mergeCmd.add_argument("branch").help("branch to merge in");
+ 
+            commands = {&initCmd, &hashObjectCmd, &catFileCmd, &addCmd, &commitCmd, &logCmd, &diffCmd, &statusCmd, &branchCmd, &switchCmd, &checkoutCmd, &mergeCmd};
+ 
+            for (auto* cmd : commands)
+                program.add_subparser(*cmd);
+        }
+ 
+        // checks which sub-command was typed & calls the matching Epoch method
+        int dispatch(){
+            // no sub-command => printing help
+            bool anyCommandUsed = false;
+            for (auto* cmd : commands){
+                if (program.is_subcommand_used(*cmd)) 
+                    anyCommandUsed = true;
+            }
+ 
+            if (!anyCommandUsed){
+                cout << program;
+                return 0;
+            }
+ 
+            // init is the only command which doesn't need an existing repository
+            if (program.is_subcommand_used(initCmd)){
+                epoch.init();
+                return 0;
+            }
+ 
+            if (!epoch.open()){
+                std::cerr << rang::fg::red << "[!] Not an epoch repository, run 'epoch init' first." << rang::fg::reset << '\n';
+                return 1;
+            }
+ 
+            if      (program.is_subcommand_used(hashObjectCmd)) epoch.hashObject(hashObjectCmd.get<string>("file"), true);
+            else if (program.is_subcommand_used(catFileCmd))    epoch.catFile(catFileCmd.get<string>("hash"));
+            else if (program.is_subcommand_used(addCmd))        epoch.add(addCmd.get<string>("file"));
+            else if (program.is_subcommand_used(commitCmd))     epoch.commit(commitCmd.get<string>("-m"));
+            else if (program.is_subcommand_used(logCmd))        epoch.log();
+            else if (program.is_subcommand_used(diffCmd))       epoch.diff(diffCmd.get<string>("commit"));
+            else if (program.is_subcommand_used(statusCmd))     epoch.status();
+            else if (program.is_subcommand_used(branchCmd))     epoch.branch(branchCmd.get<string>("name"), branchCmd.get<bool>("-d"), branchCmd.get<bool>("-D"));
+            else if (program.is_subcommand_used(switchCmd))     epoch.switchBranch(switchCmd.get<string>("name"), switchCmd.get<bool>("-c"));
+            else if (program.is_subcommand_used(checkoutCmd))   epoch.checkout(checkoutCmd.get<string>("target"), checkoutCmd.get<bool>("-b"));
+            else if (program.is_subcommand_used(mergeCmd))      epoch.merge(mergeCmd.get<string>("branch"));
+ 
+            return 0;
+        }
+ 
+    public:
+        EpochCLI(Epoch& epochRef)
+            : epoch(epochRef)
+            , program("epoch", "0.1.0")
+            , initCmd("init")
+            , hashObjectCmd("hash-object")
+            , catFileCmd("cat-file")
+            , addCmd("add")
+            , commitCmd("commit")
+            , logCmd("log")
+            , diffCmd("diff")
+            , statusCmd("status")
+            , branchCmd("branch")
+            , switchCmd("switch")
+            , checkoutCmd("checkout")
+            , mergeCmd("merge")
+            {
+                program.add_description("Epoch - A simple git clone");
+                setupCommands();
+            }
+ 
+        // the parsers point at each other, so copying this object would leave dangling references
+        EpochCLI(const EpochCLI&)            = delete;
+        EpochCLI& operator=(const EpochCLI&) = delete;
+ 
+        // parses the command line, runs the matching command & returns the process exit code
+        int run(int argc, char* argv[]){
+            try{
+                program.parse_args(argc, argv);
+            }
+            catch (const std::exception& err){
+                std::cerr << rang::fg::red << "[!] " << err.what() << rang::fg::reset << '\n';
+                std::cerr << program;
+ 
+                return 1;
+            }
+ 
+            try{
+                return dispatch();
+            }
+            catch (const std::exception& err){
+                std::cerr << rang::fg::red << "[!] Unexpected error: " << err.what() << rang::fg::reset << '\n';
+ 
+                return 1;
+            }
         }
 };
 
