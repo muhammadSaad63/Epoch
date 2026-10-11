@@ -2,6 +2,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include <cstdlib> // For std::getenv
 #include <fstream>
 #include <iostream>
 #include <filesystem>
@@ -160,9 +161,10 @@ class Epoch{
         }
 
         // returns the JSON object for the commit
-        Json getJSONCommitObject(const string& parentHash, const string& commitMessage, const string& indexData, const string& timeStamp){
+        Json getJSONCommitObject(const string& author, const string& indexData, const string& timeStamp, const string& parentHash, const string& commitMessage){
             Json commitObject;
 
+            commitObject["author"]        = author;
             commitObject["snapShot"]      = Json::parse(indexData);
             commitObject["timeStamp"]     = timeStamp;
             commitObject["parentHash"]    = parentHash;
@@ -206,6 +208,20 @@ class Epoch{
 
                 return true;
             }
+        }
+
+        // returns the name of the current from environment variables
+        string getCurrentUser(){
+            const char* user = nullptr;
+
+            #if (defined(_WIN32) || defined(_WIN64))                    // if os = windows
+                user = std::getenv("USERNAME");
+            #else                                                       // if os unix-based (linux, mac etc)
+                user =  std::getenv("USER") ? 
+                        std::getenv("USER") : std::getenv("LOGNAME");
+            #endif
+
+            return ((user)? string(user) : "unknownUser");
         }
 
     public:
@@ -347,14 +363,16 @@ class Epoch{
                 return;
             }
 
+            const string author = getCurrentUser();
+
             // getting hash at HEAD
-            string parentHash = getFileData(headPath);
+            const string parentHash = getFileData(headPath);
 
             // getting current timeStamp
-            string timeStamp = getCurrentTimeStamp();
+            const string timeStamp = getCurrentTimeStamp();
 
             // making the commit json object
-            Json commitObject = getJSONCommitObject(parentHash, commitMessage, indexData, timeStamp);
+            const Json commitObject = getJSONCommitObject(author, indexData, timeStamp, parentHash, commitMessage);
 
             // hashing and compressing commitString
             string commitString     = commitObject.dump();
@@ -391,7 +409,34 @@ class Epoch{
         void log(){
             if (!checkIfInitialized()) return;
 
-            //
+            // getting the hash/commit/pointer stored at HEAD
+            string parentCommit = getFileData(headPath);
+            if (parentCommit.empty()){
+                cout << "[!] Head is empty, no commits made.\n";
+                return;
+            }
+
+            // iterating/traversing through the commits
+            fs::path objectPath;
+            while (!parentCommit.empty()){
+                objectPath = (objectsPath / getDirName(parentCommit) / getFileName(parentCommit));
+                
+                string rawCommitData  = getFileData(objectPath);
+                Json   jsonCommitData = Json::parse(rawCommitData);
+
+                // displaying commitInfo
+                cout    << "commit "  << parentCommit                    << '\n'
+                        << "Author: " << jsonCommitData["author"]        << '\n'
+                        << "Date  : " << jsonCommitData["timeStamp"]     << '\n'
+                        << ""         << ""                              << '\n'
+                        << '\t'       << jsonCommitData["commitMessage"] << '\n'
+                        << ""         << ""                              << '\n';
+
+                // going to the parent of the current commit
+                parentCommit = jsonCommitData["parentCommit"];
+            }
+
+            cout << '\n';
         }
 
         // creates, lists, or deletes lightweight reference pointers to specific commit hashes.
