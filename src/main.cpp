@@ -354,6 +354,14 @@ class Epoch{
             return JSON::parse(indexData);
         }
 
+        // converts any user-provided path into a path relative to the repo root (given by claude)
+        fs::path getRelativePath(const fs::path& filePath){
+            fs::path absPath = fs::weakly_canonical(filePath);
+
+            return absPath.lexically_relative(fs::weakly_canonical(repoPath));
+        }
+
+
     public:
         Epoch() 
             : initialized(false)
@@ -457,8 +465,15 @@ class Epoch{
         void add(const fs::path& filePath){
             if (!checkIfInitialized()) return;
 
-            if (!fs::exists(filePath)){
-                cout << "[!] File doesn't exist.\n";
+            if (!fs::is_regular_file(filePath)){
+                cout << "[!] File doesn't exist (or isn't a regular file).\n";
+                return;
+            }
+
+            // making the path relative to the repo root & making sure it's not outside the repo / inside .epoch
+            const fs::path relPath = getRelativePath(filePath);
+            if (relPath.empty() || *relPath.begin() == ".." || *relPath.begin() == ".epoch"){
+                cout << "[!] File is outside the repository (or inside .epoch).\n";
                 return;
             }
 
@@ -470,7 +485,7 @@ class Epoch{
             }
 
             // updates the index file (staging area)
-            bool indexed = updateIndexFile(filePath, fileHash);
+            bool indexed = updateIndexFile(relPath, fileHash);
             if (!indexed)
                 cout << "[!] Error indexing file.\n";
         }
