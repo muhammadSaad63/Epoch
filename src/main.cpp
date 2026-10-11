@@ -18,7 +18,7 @@
 
 // Alias for convenience with std::filesystem
 using std::cin, std::cout;
-using Json = nlohmann::json;
+using JSON = nlohmann::json;
 using std::string, std::vector;
 namespace fs = std::filesystem;
 
@@ -82,11 +82,11 @@ class Epoch{
         }
 
         bool updateIndexFile(const fs::path& filePath, const string& fileHash){
-            Json jsonData;
+            JSON jsonData;
 
             // accessing & parsing json data from indexFile
             const string& indexData = getFileData(indexPath);
-            jsonData = Json::parse(indexData);
+            jsonData = JSON::parse(indexData);
 
             // adding key-value pair
             jsonData[filePath.string()] = fileHash;
@@ -161,11 +161,11 @@ class Epoch{
         }
 
         // returns the JSON object for the commit
-        Json getJSONCommitObject(const string& author, const string& indexData, const string& timeStamp, const string& parentHash, const string& commitMessage){
-            Json commitObject;
+        JSON getJSONCommitObject(const string& author, const string& indexData, const string& timeStamp, const string& parentHash, const string& commitMessage){
+            JSON commitObject;
 
             commitObject["author"]        = author;
-            commitObject["snapShot"]      = Json::parse(indexData);
+            commitObject["snapShot"]      = JSON::parse(indexData);
             commitObject["timeStamp"]     = timeStamp;
             commitObject["parentHash"]    = parentHash;
             commitObject["commitMessage"] = commitMessage;
@@ -256,16 +256,22 @@ class Epoch{
         // validates all the hashes in the objects dir
         bool validateObjects(){
             //
+
+            return true;
         }
 
         // validates all the hashes in the HEAD file
         bool validateHEAD(){
             //
+
+            return true;
         }
         
         // validates all the hashes in the index file
         bool validateIndex(){
             //
+
+            return true;
         }
 
     public:
@@ -416,7 +422,7 @@ class Epoch{
             const string timeStamp = getCurrentTimeStamp();
 
             // making the commit json object
-            const Json commitObject = getJSONCommitObject(author, indexData, timeStamp, parentHash, commitMessage);
+            const JSON commitObject = getJSONCommitObject(author, indexData, timeStamp, parentHash, commitMessage);
 
             // hashing and compressing commitString
             string commitString     = commitObject.dump();
@@ -433,20 +439,6 @@ class Epoch{
             cout << "[*] Committed successfully!"         << '\n';
             cout << "    Commit Hash : " << commitHash    << '\n';
             cout << "    Message     : " << commitMessage << '\n';
-        }
-
-        // inspects and displays differences between the working directory, the staging index, and the current HEAD commit.
-        void status(){
-            if (!checkIfInitialized()) return;
-
-            //
-        }
-
-        // compares line-by-line text changes between files in the working tree, index, or specific historical commits.
-        void diff(){
-            if (!checkIfInitialized()) return;
-
-            //
         }
 
         // traverses and prints the chronological commit history backwards starting from the current HEAD pointer.
@@ -467,7 +459,7 @@ class Epoch{
                 
                 string rawCommitData          = getFileData(objectPath);
                 string decompressedCommitData = decompressData(rawCommitData);
-                Json   jsonCommitData         = Json::parse(decompressedCommitData);
+                JSON   jsonCommitData         = JSON::parse(decompressedCommitData);
 
                 // displaying commitInfo
                 cout    << "commit "  << parentCommit                    << '\n'
@@ -482,6 +474,40 @@ class Epoch{
             }
 
             cout << '\n';
+        }
+
+        // compares line-by-line text changes between files in the working tree, index, or specific historical commits.
+        void diff(const string& commitHashToCompare){
+            if (!checkIfInitialized()) return;
+
+            // accessing file with <commitHashToCompare>
+            const string objectPath = (objectsPath / getDirName(commitHashToCompare) / getFileData(commitHashToCompare));
+            if (fs::exists(objectPath)){
+                cout << "[!] No such hash exists.\n";
+                return;
+            }
+
+            // accessing, inflating, & parsing json data at <objectPath> file
+            const string rawCommitData          = getFileData(objectPath);
+            const string decompressedCommitData = decompressData(rawCommitData);
+            const JSON   jsonCommitData         = JSON::parse(decompressedCommitData);
+
+            // accessing, inflating, & parsing json data at jsonCommitData["snapShot"]
+            const string rawSnapShot          = jsonCommitData["snapShot"];
+            const string decompressedSnapShot = decompressData(rawSnapShot);
+            const JSON jsonSnapShot         = JSON::parse(decompressedSnapShot);
+
+            // iterating across every json object in jsonSnapShot array
+            for (const auto& [filePath, fileHash] : jsonSnapShot.items()){
+                
+            }
+        }
+
+        // inspects and displays differences between the working directory, the staging index, and the current HEAD commit.
+        void status(){
+            if (!checkIfInitialized()) return;
+
+            //
         }
 
         // creates, lists, or deletes lightweight reference pointers to specific commit hashes.
