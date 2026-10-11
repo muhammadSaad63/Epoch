@@ -41,7 +41,7 @@ class Epoch{
         // checks if epoch is initialized inside the current directory
         bool checkIfInitialized(){
             if (!initialized){
-                cout << "[!] Epoch is not initialized inside the current directory.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Epoch is not initialized inside the current directory.\n";
                 return false;
             }
 
@@ -94,7 +94,7 @@ class Epoch{
             // opening indexFile (in overwrite mode)
             std::ofstream indexFile(indexPath, std::ios::trunc);
             if (!indexFile){
-                cout << "[!] Failed to open index file for writing.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Failed to open index file for writing.\n";
                 return false;
             }
 
@@ -155,7 +155,7 @@ class Epoch{
             std::ofstream headFile(headPath);
             
             if (!headFile){
-                cout << "[!] Failed to update HEAD pointer.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Failed to update HEAD pointer.\n";
                 return false;
             }
 
@@ -204,7 +204,7 @@ class Epoch{
             // storing file's contents in .epoch/objects/<dirName>/<fileName>
             {
                 if (!outFile){
-                    cout << "[!] Failed to write commit object to database.\n";
+                    cout << rang::fg::red << "[!]" << rang::fg::reset << " Failed to write commit object to database.\n";
                     return false;
                 } 
                 
@@ -234,7 +234,7 @@ class Epoch{
                 this->useSHA256 = useSHA256;
                 
                 if (!validateHashes()){
-                    cout << "[!] Error while updating hashing algorithm & stored hashes.\n";
+                    cout << rang::fg::red << "[!]" << rang::fg::reset << " Error while updating hashing algorithm & stored hashes.\n";
                     this->useSHA256 = !useSHA256;                                               // reverting change
                     
                     return;
@@ -285,14 +285,14 @@ class Epoch{
             
             // validates length of the hex
             if (hashToValidate.length() != expectedLen){
-                cout << "[!] Invalid commit hash length.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Invalid commit hash length.\n";
                 return false;
             }
 
             // checks if each char in the hash is a hex char
             for (unsigned char c : hashToValidate){
                 if (!std::isxdigit(c)){
-                    cout << "[!] Invalid commit hash, non-hex character found.\n";
+                    cout << rang::fg::red << "[!]" << rang::fg::reset << " Invalid commit hash, non-hex character found.\n";
                     return false;
                 }
             }
@@ -333,7 +333,7 @@ class Epoch{
             
             // checking objectPath
             if (!fs::exists(objectPath)){
-                cout << "[!] No such commit hash exists.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " No such commit hash exists.\n";
                 return JSON::object();
             }
             
@@ -383,7 +383,7 @@ class Epoch{
 
             // checking if epoch was already initialized previously
             if (fs::exists(repoPath) && fs::exists(epochPath) && fs::exists(headPath) && fs::exists(indexPath) && fs::exists(objectsPath)){
-                cout << "[!] Epoch is already initialized inside the current directory.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Epoch is already initialized inside the current directory.\n";
                 initialized = true;
                 
                 return;
@@ -424,7 +424,7 @@ class Epoch{
             if (!checkIfInitialized()) return ":(";
 
             if (!fs::exists(filePath)){
-                cout << "[!] File doesn't exist.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " File doesn't exist.\n";
                 return ":(";
             }
             
@@ -454,7 +454,7 @@ class Epoch{
             // accessing & validating data at objectHash
             string decompressedObjectData = readCompressedObject(objectHash);
             if (decompressedObjectData == ":("){
-                cout << "[!] Hash doesn't exist.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Hash doesn't exist.\n";
                 return;
             }
 
@@ -467,28 +467,28 @@ class Epoch{
             if (!checkIfInitialized()) return;
 
             if (!fs::is_regular_file(filePath)){
-                cout << "[!] File doesn't exist (or isn't a regular file).\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " File doesn't exist (or isn't a regular file).\n";
                 return;
             }
 
             // making the path relative to the repo root & making sure it's not outside the repo / inside .epoch
             const fs::path relPath = getRelativePath(filePath);
             if (relPath.empty() || *relPath.begin() == ".." || *relPath.begin() == ".epoch"){
-                cout << "[!] File is outside the repository (or inside .epoch).\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " File is outside the repository (or inside .epoch).\n";
                 return;
             }
 
             // calculates the hash and add its corresponding object to .epoch/objects/ 
             const string fileHash = hashObject(filePath, false);
             if (fileHash == ":("){
-                cout << "[!] Error hashing file.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Error hashing file.\n";
                 return;
             }
 
             // updates the index file (staging area)
             bool indexed = updateIndexFile(relPath, fileHash);
             if (!indexed)
-                cout << "[!] Error indexing file.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Error indexing file.\n";
         }
 
         // packages the staged entries from the index into a commit object and updates the HEAD pointer.
@@ -517,7 +517,7 @@ class Epoch{
 
             // nothing changed compared to the parent commit
             if (snapShot == parentSnapShot){
-                cout << "[!] Nothing to commit, working tree clean.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Nothing to commit, working tree clean.\n";
                 return;
             }
 
@@ -554,7 +554,7 @@ class Epoch{
             // getting the hash/commit/pointer stored at HEAD
             string parentCommit = getFileData(headPath);
             if (parentCommit.empty()){
-                cout << "[!] Head is empty, no commits made.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Head is empty, no commits made.\n";
                 return;
             }
 
@@ -592,14 +592,14 @@ class Epoch{
             // accessing & validating the json commitData at commitHashToCompare
             JSON jsonCommitData = parseCommitObject(commitHashToCompare);
             if (jsonCommitData.empty()){
-                cout << "[!] Unable to access JSON data at " << commitHashToCompare << '\n'; 
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Unable to access JSON data at " << commitHashToCompare << '\n'; 
                 return;
             }
             
             // accessing snapShot at jsonCommitData["snapShot"]
             const JSON jsonSnapShot = jsonCommitData["snapShot"];
             if (jsonSnapShot.empty()){
-                cout << "[!] Commit snapshot is empty.\n";
+                cout << rang::fg::red << "[!]" << rang::fg::reset << " Commit snapshot is empty.\n";
                 return;
             }
 
@@ -622,7 +622,7 @@ class Epoch{
                 // getting & validating contents of fileHash from .epoch/objects/
                 string oldContent = readCompressedObject(fileHash);
                 if (oldContent == ":("){
-                    cout << "[!] Hash doesn't exist.\n";
+                    cout << rang::fg::red << "[!]" << rang::fg::reset << " Hash doesn't exist.\n";
                     continue;
                 }
 
