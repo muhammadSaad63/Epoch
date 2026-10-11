@@ -33,7 +33,7 @@ class Epoch{
         fs::path objectsPath;
         
         bool     initialized;
-        bool     useSha256;
+        bool     useSHA256;
 
         // checks if epoch is initialized inside the current directory
         bool checkIfInitialized(){
@@ -61,7 +61,7 @@ class Epoch{
 
         // takes input a string data, computes its hash, and then returns it.
         string generateHash(const string& data){
-            if (!useSha256){
+            if (!useSHA256){
                 SHA1 sha1;
                 return sha1(data);                      // returns 40-char SHA-1 hash
             } 
@@ -224,10 +224,54 @@ class Epoch{
             return ((user)? string(user) : "unknownUser");
         }
 
+        void updateHashingAlgorithm(const bool useSHA256){
+            if (this->useSHA256 != useSHA256){
+                this->useSHA256 = useSHA256;
+                
+                if (!validateHashes()){
+                    cout << "[!] Error while updating hashing algorithm & stored hashes.\n";
+                    this->useSHA256 = !useSHA256;                                               // reverting change
+                    
+                    return;
+                }
+
+                cout << "[*] Successfully updated & validated all the hashes.\n";
+            }
+        }
+
+        // iterate through all instances of hashes in the .epoch folder & ensures they all use the corr hashing algo
+        bool validateHashes(){
+            // validates all the hashes in the objects dir
+            if (!validateObjects()) return false;
+
+            // validates all the hashes in the HEAD file
+            if (!validateHEAD()) return false;
+            
+            // validates all the hashes in the index file
+            if (!validateIndex()) return false;
+
+            return true;
+        }
+
+        // validates all the hashes in the objects dir
+        bool validateObjects(){
+            //
+        }
+
+        // validates all the hashes in the HEAD file
+        bool validateHEAD(){
+            //
+        }
+        
+        // validates all the hashes in the index file
+        bool validateIndex(){
+            //
+        }
+
     public:
         Epoch() 
             : initialized(false)
-            , useSha256(false)
+            , useSHA256(false)
             {}
 
         ~Epoch() 
@@ -309,7 +353,7 @@ class Epoch{
             if (!checkIfInitialized()) return;
 
             // validating objectHash's length
-            if (objectHash.length() != 40) {
+            if (objectHash.length() != ((useSHA256)? 64 : 40)){
                 cout << "[!] Invalid hash length.\n";
                 return;
             }
@@ -433,7 +477,7 @@ class Epoch{
                         << ""         << ""                              << '\n';
 
                 // going to the parent of the current commit
-                parentCommit = jsonCommitData["parentCommit"];
+                parentCommit = jsonCommitData["parentHash"];
             }
 
             cout << '\n';
