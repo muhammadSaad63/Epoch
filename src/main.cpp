@@ -85,8 +85,7 @@ class Epoch{
             JSON jsonData;
 
             // accessing & parsing json data from indexFile
-            const string& indexData = getFileData(indexPath);
-            jsonData = JSON::parse(indexData);
+            const string& indexData = getIndexJson();
 
             // adding key-value pair
             jsonData[filePath.string()] = fileHash;
@@ -286,6 +285,57 @@ class Epoch{
             return true;
         }
 
+        vector<string> splitIntoLines(const string& text){
+            string line;
+            vector<string> splitText;
+            std::stringstream ssText(text);            
+
+            while (std::getline(ssText, line))
+                splitText.push_back(line);
+
+            splitText.shrink_to_fit();
+
+            return splitText;
+        }
+
+        string readCompressedObject(const string& fileHash){
+            fs::path oldPath = (objectsPath / getDirName(fileHash) / getFileName(fileHash));
+            
+            if (fs::exists(oldPath))
+                return decompressData(getFileData(oldPath));
+
+            return ":(";
+        }
+
+        // accesses, parses, & then returns the JSON data stored at .epoch/objects/<commitHash>
+        JSON parseCommitObject(const string& commitHash){
+            // building
+            fs::path objectPath = (objectsPath / getDirName(commitHash) / getFileName(commitHash));
+            
+            // checking objectPath
+            if (!fs::exists(objectPath)){
+                cout << "[!] No such commit hash exists.\n";
+                return JSON::object();
+            }
+            
+            // accessing, inflating, & parsing json data at <objectPath> file   
+            const string rawCommitData          = getFileData(objectPath);
+            const string decompressedCommitData = decompressData(rawCommitData);
+            const JSON   jsonCommitData         = JSON::parse(decompressedCommitData);
+
+            return jsonCommitData;
+        }
+
+        // loads, reads, and parses the .epoch/index file into a JSON object & then returns it
+        JSON getIndexJson(){
+            string indexData = getFileData(indexPath);
+
+            if (indexData.empty() || indexData == "{}")
+                return JSON::object();
+
+            return JSON::parse(indexData);
+        }
+
     public:
         Epoch() 
             : initialized(false)
@@ -374,17 +424,12 @@ class Epoch{
             if (!isHashLengthValid(objectHash)) 
                 return;
 
-            fs::path objectPath = (objectsPath / getDirName(objectHash) / getFileName(objectHash));
-
-            // object with hash objectHash doesn't exist
-            if (!fs::exists(objectPath)){
+            // accessing & validating data at objectHash
+            string decompressedObjectData = readCompressedObject(objectHash);
+            if (decompressedObjectData == ":("){
                 cout << "[!] Hash doesn't exist.\n";
                 return;
             }
-
-            // object with hash objectHash exists
-            string objectData             = getFileData(objectPath);
-            string decompressedObjectData = decompressData(objectData);
 
             // displaying contents at objectHash
             cout << decompressedObjectData << '\n';
@@ -465,11 +510,8 @@ class Epoch{
             // iterating/traversing through the commits
             fs::path objectPath;
             while (!parentCommit.empty()){
-                objectPath = (objectsPath / getDirName(parentCommit) / getFileName(parentCommit));
-                
-                string rawCommitData          = getFileData(objectPath);
-                string decompressedCommitData = decompressData(rawCommitData);
-                JSON   jsonCommitData         = JSON::parse(decompressedCommitData);
+                JSON jsonCommitData = parseCommitObject(parentCommit);
+                if (jsonCommitData.empty()) break;
 
                 // displaying commitInfo
                 cout    << "commit "  << parentCommit                    << '\n'
@@ -494,18 +536,13 @@ class Epoch{
             if (!isHashLengthValid(commitHashToCompare)) 
                 return;
 
-            // building & checking objectPath
-            fs::path objectPath = objectsPath / getDirName(commitHashToCompare) / getFileName(commitHashToCompare);
-            if (!fs::exists(objectPath)){
-                cout << "[!] No such commit hash exists.\n";
+            // accessing & validating the json commitData at commitHashToCompare
+            JSON jsonCommitData = parseCommitObject(commitHashToCompare);
+            if (jsonCommitData.empty()){
+                cout << "[!] Unable to access JSON data at " << commitHashToCompare << '\n'; 
                 return;
             }
             
-            // accessing, inflating, & parsing json data at <objectPath> file   
-            const string rawCommitData          = getFileData(objectPath);
-            const string decompressedCommitData = decompressData(rawCommitData);
-            const JSON   jsonCommitData         = JSON::parse(decompressedCommitData);
-
             // accessing snapShot at jsonCommitData["snapShot"]
             const JSON jsonSnapShot = jsonCommitData["snapShot"];
             if (jsonSnapShot.empty()){
@@ -529,40 +566,16 @@ class Epoch{
                     currContent = getFileData(workFilePath);
                 }
 
-                // getting contents of fileHash from .epoch/objects/
-                string oldContent = "";
-                {
-                    fs::path oldPath = (objectsPath / getDirName(fileHash) / getFileName(fileHash));
-                    
-                    if (fs::exists(oldPath))
-                        oldContent = decompressData(getFileData(oldPath));
+                // getting & validating contents of fileHash from .epoch/objects/
+                string oldContent = readCompressedObject(fileHash);
+                if (oldContent== ":("){
+                    cout << "[!] Hash doesn't exist.\n";
+                    return;
                 }
 
-                // splitting contents of oldContent (which is a continuous string) into oldContentLines (a string vector) as dtl uses the latter
-                vector<string> oldContentLines;
-                {
-                    std::stringstream ssOldContent(oldContent);
-                    string line;
-
-                    while (std::getline(ssOldContent, line)) {
-                        oldContentLines.push_back(line);
-                    }
-
-                    oldContentLines.shrink_to_fit();
-                }
-
-                // Split current contents into lines (same as that for oldContent)
-                vector<string> currContentLines;
-                {
-                    std::stringstream ssCurrContent(currContent);
-                    string line;
-
-                    while (std::getline(ssCurrContent, line)) {
-                        currContentLines.push_back(line);
-                    }
-
-                    currContentLines.shrink_to_fit();
-                }
+                // splitting contents of contents (which are continuous strings) into contentLines (string vectors) as dtl uses the latter
+                vector<string> oldContentLines = splitIntoLines(oldContent);
+                vector<string> currContentLines = splitIntoLines(currContent);
 
                 // running dtl diff engine on both vector strings
                 dtl::Diff<string> diff(oldContentLines, currContentLines);              // prepares the diff engine to compare these two sequences line-by-line using a longest common subsequence / edit-distance algorithm
