@@ -513,11 +513,71 @@ class Epoch{
                 return;
             }
 
-            // iterating across every json object in jsonSnapShot array
-            for (const auto& [filePath, fileHash] : jsonSnapShot.items()){
-                const string fileData = getFileData(filePath);
-                
-                const string toComparePath = (objectsPath / getDirName(fileHash) / getFileName(fileHash));
+            // iterating across every file in the snapShot JSON array
+            for (const auto& [filePathStr, fileHash] : jsonSnapShot.items()){
+                // Get current working tree content
+                string currentContent;
+                {
+                    fs::path workFilePath = (repoPath / filePathStr);
+                    
+                    // file was deleted in curr dir / working tree
+                    if (!fs::exists(workFilePath)){
+                        cout << rang::fg::red << "--- File deleted in working tree: " << filePathStr << rang::fg::reset << '\n';
+                        continue;
+                    } 
+
+                    currentContent = getFileData(workFilePath);
+                }
+
+                // getting contents of fileHash from .epoch/objects/
+                string oldContent = "";
+                {
+                    fs::path oldPath = (objectsPath / getDirName(fileHash) / getFileName(fileHash));
+                    
+                    if (fs::exists(oldPath))
+                        oldContent = decompressData(getFileData(oldPath));
+                }
+
+                // splitting contents of oldContent (which is a continuous string) into oldContentLines (a string vector) as dtl uses the latter
+                vector<string> oldContentLines;
+                {
+                    std::stringstream ssOldContent(oldContent);
+                    string line;
+
+                    while (std::getline(ssOldContent, line)) {
+                        oldContentLines.push_back(line);
+                    }
+
+                    oldContentLines.shrink_to_fit();
+                }
+
+                // Split current contents into lines
+                vector<string> newLines;
+                std::stringstream ssNew(currentContent);
+                while (std::getline(ssNew, line)) {
+                    newLines.push_back(line);
+                }
+
+                // Run dtl diff engine
+                dtl::Diff<string> d(oldLines, newLines);
+                d.compose();
+
+                // Print diff header & colored output
+                cout << "diff --epoch a/" << filePathStr << " b/" << filePathStr << '\n';
+                cout << "--- a/" << filePathStr << " (commit " << commitHashToCompare.substr(0, 7) << ")\n";
+                cout << "+++ b/" << filePathStr << " (working tree)\n";
+
+                const auto& ses = d.getSes();
+                for (const auto& element : ses.getSequence()) {
+                    if (element.type == dtl::SES_ADD) {
+                        cout << rang::fg::green << "+ " << element.content << rang::fg::reset << '\n';
+                    } else if (element.type == dtl::SES_DELETE) {
+                        cout << rang::fg::red << "- " << element.content << rang::fg::reset << '\n';
+                    } else {
+                        cout << "  " << element.content << '\n';
+                    }
+                }
+                cout << '\n';
             }
         }
 
