@@ -516,7 +516,7 @@ class Epoch{
             // iterating across every file in the snapShot JSON array
             for (const auto& [filePathStr, fileHash] : jsonSnapShot.items()){
                 // Get current working tree content
-                string currentContent;
+                string currContent;
                 {
                     fs::path workFilePath = (repoPath / filePathStr);
                     
@@ -526,7 +526,7 @@ class Epoch{
                         continue;
                     } 
 
-                    currentContent = getFileData(workFilePath);
+                    currContent = getFileData(workFilePath);
                 }
 
                 // getting contents of fileHash from .epoch/objects/
@@ -551,33 +551,45 @@ class Epoch{
                     oldContentLines.shrink_to_fit();
                 }
 
-                // Split current contents into lines
-                vector<string> newLines;
-                std::stringstream ssNew(currentContent);
-                while (std::getline(ssNew, line)) {
-                    newLines.push_back(line);
+                // Split current contents into lines (same as that for oldContent)
+                vector<string> currContentLines;
+                {
+                    std::stringstream ssCurrContent(currContent);
+                    string line;
+
+                    while (std::getline(ssCurrContent, line)) {
+                        currContentLines.push_back(line);
+                    }
+
+                    currContentLines.shrink_to_fit();
                 }
 
-                // Run dtl diff engine
-                dtl::Diff<string> d(oldLines, newLines);
-                d.compose();
+                // running dtl diff engine on both vector strings
+                dtl::Diff<string> diff(oldContentLines, currContentLines);              // prepares the diff engine to compare these two sequences line-by-line using a longest common subsequence / edit-distance algorithm
+                diff.compose();                                                         // executes the diff engine: tells the engine to start processing and compute the differences
 
                 // Print diff header & colored output
-                cout << "diff --epoch a/" << filePathStr << " b/" << filePathStr << '\n';
-                cout << "--- a/" << filePathStr << " (commit " << commitHashToCompare.substr(0, 7) << ")\n";
-                cout << "+++ b/" << filePathStr << " (working tree)\n";
+                {
+                    // printing header
+                    cout << "diff --epoch a/" << filePathStr << " b/" << filePathStr << '\n';
+                    cout << "--- a/" << filePathStr << " (commit " << commitHashToCompare.substr(0, 7) << ")\n";
+                    cout << "+++ b/" << filePathStr << " (working tree)\n";
 
-                const auto& ses = d.getSes();
-                for (const auto& element : ses.getSequence()) {
-                    if (element.type == dtl::SES_ADD) {
-                        cout << rang::fg::green << "+ " << element.content << rang::fg::reset << '\n';
-                    } else if (element.type == dtl::SES_DELETE) {
-                        cout << rang::fg::red << "- " << element.content << rang::fg::reset << '\n';
-                    } else {
-                        cout << "  " << element.content << '\n';
+                    // printing line by line diff
+                    const auto& ses = diff.getSes();                                                        // ses = shortest edit script: after diff.compose() runs, dtl generates an ordered sequence of operations required to transform the old file into the new file.
+                    for (const auto& element : ses.getSequence()){                                          // each element is std::pair with first being elemInfo & second being the actual string content
+                        if (element.second.type == dtl::SES_ADD){                                           // a line was added in currContent
+                            cout << rang::fg::green << "+ " << element.first << rang::fg::reset << '\n';
+                        } 
+                        else if (element.second.type == dtl::SES_DELETE){                                   // a line was deleted in currContent
+                            cout << rang::fg::red   << "- " << element.first << rang::fg::reset << '\n';
+                        } 
+                        else                                                                                // the line was unchanged in both
+                            cout << rang::fg::gray  <<"   " << element.first << rang::fg::reset << '\n';
                     }
+
+                    cout << '\n';
                 }
-                cout << '\n';
             }
         }
 
