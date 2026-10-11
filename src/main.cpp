@@ -13,6 +13,7 @@
 #include "libs/cli11/CLI11.hpp"                         // Argument Parsing: CLI11
 #include "libs/nlohmann/json.hpp"                       // Indexing / JSON: nlohmann/json
 #include "libs/hash-library/sha1.h"                     // Hashing: stbrumme/hash-library
+#include "libs/hash-library/sha256.h"                     // Hashing: stbrumme/hash-library
 
 // Alias for convenience with std::filesystem
 using std::cin, std::cout;
@@ -29,7 +30,9 @@ class Epoch{
         fs::path headPath;
         fs::path indexPath;
         fs::path objectsPath;
+        
         bool     initialized;
+        bool     useSha256;
 
         // checks if epoch is initialized inside the current directory
         bool checkIfInitialized(){
@@ -57,9 +60,14 @@ class Epoch{
 
         // takes input a string data, computes its hash, and then returns it.
         string generateHash(const string& data){
-            SHA1 sha1;
-
-            return sha1(data);
+            if (!useSha256){
+                SHA1 sha1;
+                return sha1(data);                      // returns 40-char SHA-1 hash
+            } 
+            else{
+                SHA256 sha256;
+                return sha256(data);                    // returns 64-char SHA-256 hash
+            }
         }
 
         // returns the first 2 chars of the hash string
@@ -203,6 +211,7 @@ class Epoch{
     public:
         Epoch() 
             : initialized(false)
+            , useSha256(false)
             {}
 
         ~Epoch() 
