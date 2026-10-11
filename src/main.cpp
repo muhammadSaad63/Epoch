@@ -613,18 +613,18 @@ class Epoch{
                 vector<string> currContentLines = splitIntoLines(currContent);
 
                 // running dtl diff engine on both vector strings
-                dtl::Diff<string> diff(oldContentLines, currContentLines);              // prepares the diff engine to compare these two sequences line-by-line using a longest common subsequence / edit-distance algorithm
-                diff.compose();                                                         // executes the diff engine: tells the engine to start processing and compute the differences
+                dtl::Diff<string> lineDiff(oldContentLines, currContentLines);              // prepares the diff engine to compare these two sequences line-by-line using a longest common subsequence / edit-distance algorithm
+                lineDiff.compose();                                                         // executes the diff engine: tells the engine to start processing and compute the differences
 
                 // Print diff header & colored output
                 {
                     // printing header
-                    cout << "diff --epoch a/" << filePathStr << " b/" << filePathStr << '\n';
-                    cout << "--- a/" << filePathStr << " (commit " << commitHashToCompare.substr(0, 7) << ")\n";
-                    cout << "+++ b/" << filePathStr << " (working tree)\n";
+                    cout << "diff --epoch a/" << filePathStr << " b/"                << filePathStr << '\n';
+                    cout << "--- a/"          << filePathStr << " (commit "          << commitHashToCompare.substr(0, 7) << ")\n";
+                    cout << "+++ b/"          << filePathStr << " (working tree)\n";
 
                     // printing line by line diff
-                    const auto& ses = diff.getSes();                                                        // ses = shortest edit script: after diff.compose() runs, dtl generates an ordered sequence of operations required to transform the old file into the new file.
+                    const auto& ses = lineDiff.getSes();                                                        // ses = shortest edit script: after diff.compose() runs, dtl generates an ordered sequence of operations required to transform the old file into the new file.
                     for (const auto& element : ses.getSequence()){                                          // each element is std::pair with first being elemInfo & second being the actual string content
                         if (element.second.type == dtl::SES_ADD){                                           // a line was added in currContent
                             cout << rang::fg::green << "+ " << element.first << rang::fg::reset << '\n';
