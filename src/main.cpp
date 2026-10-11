@@ -131,7 +131,7 @@ class Epoch{
             
             int res      = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
             int attempts = 0;
-            
+
             while (res == Z_BUF_ERROR && attempts < 10){
                 dest.resize(dest.size() * 2);
                 
@@ -278,13 +278,22 @@ class Epoch{
             return true;
         }
 
-        // validates whether the provided hash is of the correct length
-        bool isHashLengthValid(const string& hashToValidate){
-            auto expectedLen = (( useSHA256 )? 64 : 40);
-
+        // validates whether the provided hash is of the correct length & only contains hex characters
+        bool isHashValid(const string& hashToValidate){
+            std::size_t expectedLen = (( useSHA256 )? 64 : 40);
+            
+            // validates length of the hex
             if (hashToValidate.length() != expectedLen){
                 cout << "[!] Invalid commit hash length.\n";
                 return false;
+            }
+
+            // checks if each char in the hash is a hex char
+            for (unsigned char c : hashToValidate){
+                if (!std::isxdigit(c)){
+                    cout << "[!] Invalid commit hash, non-hex character found.\n";
+                    return false;
+                }
             }
 
             return true;
@@ -295,8 +304,12 @@ class Epoch{
             vector<string> splitText;
             std::stringstream ssText(text);            
 
-            while (std::getline(ssText, line))
+            while (std::getline(ssText, line)){
+                if (!line.empty() && line.back() == '\r')           // removing crlf
+                    line.pop_back();
+                    
                 splitText.push_back(line);
+            }
 
             splitText.shrink_to_fit();
 
@@ -416,7 +429,7 @@ class Epoch{
 
 
             if (printHash)
-                cout << "Hash (sha1): " << fileHash << '\n';
+                cout << ((useSHA256)? "Hash (sha256): " : "Hash (sha1): ") << fileHash << '\n';
 
             return fileHash;
         }
@@ -426,7 +439,7 @@ class Epoch{
             if (!checkIfInitialized()) return;
 
             // validating objectHash's length
-            if (!isHashLengthValid(objectHash)) 
+            if (!isHashValid(objectHash)) 
                 return;
 
             // accessing & validating data at objectHash
@@ -437,7 +450,7 @@ class Epoch{
             }
 
             // displaying contents at objectHash
-            cout << decompressedObjectData << '\n';
+            cout << decompressedObjectData;
         }
         
         // takes input a file path, stages the file by hashing its content and recording an entry into the index file.
@@ -450,7 +463,7 @@ class Epoch{
             }
 
             // calculates the hash and add its corresponding object to .epoch/objects/ 
-            const string& fileHash = hashObject(filePath, false);
+            const string fileHash = hashObject(filePath, false);
             if (fileHash == ":("){
                 cout << "[!] Error hashing file.\n";
                 return;
@@ -515,6 +528,9 @@ class Epoch{
             // iterating/traversing through the commits
             fs::path objectPath;
             while (!parentCommit.empty()){
+                // validating parentCommit hash
+                if (!isHashValid(parentCommit)) break;
+
                 JSON jsonCommitData = parseCommitObject(parentCommit);
                 if (jsonCommitData.empty()) break;
 
@@ -537,9 +553,8 @@ class Epoch{
         void diff(const string& commitHashToCompare){
             if (!checkIfInitialized()) return;
 
-            // validating hash length
-            if (!isHashLengthValid(commitHashToCompare)) 
-                return;
+            // validating hash
+            if (!isHashValid(commitHashToCompare)) return;
 
             // accessing & validating the json commitData at commitHashToCompare
             JSON jsonCommitData = parseCommitObject(commitHashToCompare);
