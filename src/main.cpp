@@ -1,9 +1,11 @@
 // STL includes
+#include <ctime>
 #include <chrono>
 #include <string>
 #include <vector>
 #include <cstdlib> // For std::getenv
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <filesystem>
 
@@ -82,13 +84,11 @@ class Epoch{
         }
 
         bool updateIndexFile(const fs::path& filePath, const string& fileHash){
-            JSON jsonData;
-
             // accessing & parsing json data from indexFile
-            const string& indexData = getIndexJson();
-
+            JSON jsonData = getIndexJson();
+            
             // adding key-value pair
-            jsonData[filePath.string()] = fileHash;
+            jsonData[filePath.generic_string()] = fileHash;
 
             // opening indexFile (in overwrite mode)
             std::ofstream indexFile(indexPath, std::ios::trunc);
@@ -129,11 +129,16 @@ class Epoch{
             uLongf destLen = data.size() * 4; 
             string dest(destLen, '\0');
             
-            int res = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
-            while (res == Z_BUF_ERROR){
-                destLen *= 2;
-                dest.resize(destLen);
-                res = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
+            int res      = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
+            int attempts = 0;
+            
+            while (res == Z_BUF_ERROR && attempts < 10){
+                dest.resize(dest.size() * 2);
+                
+                destLen = dest.size();                                  // uncompress overwrites destLen, so it has to be reset every time
+                res     = uncompress((Bytef*)dest.data(), &destLen, (const Bytef*)data.data(), data.size());
+                
+                attempts++;
             }
             
             if (res == Z_OK){
@@ -198,7 +203,7 @@ class Epoch{
             // storing file's contents in .epoch/objects/<dirName>/<fileName>
             {
                 if (!outFile){
-                    outFile << "[!] Failed to write commit object to database.\n";
+                    cout << "[!] Failed to write commit object to database.\n";
                     return false;
                 } 
                 
@@ -514,15 +519,15 @@ class Epoch{
                 if (jsonCommitData.empty()) break;
 
                 // displaying commitInfo
-                cout    << "commit "  << parentCommit                    << '\n'
-                        << "Author: " << jsonCommitData["author"]        << '\n'
-                        << "Date  : " << jsonCommitData["timeStamp"]     << '\n'
-                        << ""         << ""                              << '\n'
-                        << '\t'       << jsonCommitData["commitMessage"] << '\n'
-                        << ""         << ""                              << '\n';
+                cout    << "commit "  << parentCommit                                   << '\n'
+                        << "Author: " << jsonCommitData["author"]        .get<string>() << '\n'
+                        << "Date  : " << jsonCommitData["timeStamp"]     .get<string>() << '\n'
+                        << ""         << ""                                             << '\n'
+                        << '\t'       << jsonCommitData["commitMessage"] .get<string>() << '\n'
+                        << ""         << ""                                             << '\n';
 
                 // going to the parent of the current commit
-                parentCommit = jsonCommitData["parentHash"];
+                parentCommit = jsonCommitData["parentHash"].get<string>();
             }
 
             cout << '\n';
@@ -568,9 +573,9 @@ class Epoch{
 
                 // getting & validating contents of fileHash from .epoch/objects/
                 string oldContent = readCompressedObject(fileHash);
-                if (oldContent== ":("){
+                if (oldContent == ":("){
                     cout << "[!] Hash doesn't exist.\n";
-                    return;
+                    continue;
                 }
 
                 // splitting contents of contents (which are continuous strings) into contentLines (string vectors) as dtl uses the latter
